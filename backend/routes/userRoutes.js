@@ -1,10 +1,12 @@
 import express from 'express';
-import { getMe, searchUsers } from '../controllers/userController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { getMeController, searchUsersController } from '../controllers/userController.js';
+import { requireAuth } from '../middleware/authMiddleware.js';
+import { validateRequest } from '../middleware/validateMiddleware.js';
+import { searchValidation } from '../validators/chatValidators.js';
 
 const router = express.Router();
 
-router.get('/me', protect, getMe);
-router.get('/search', protect, searchUsers);
+router.get('/me', requireAuth, getMeController);
+router.get('/search', requireAuth, searchValidation, validateRequest, searchUsersController);
 
 export default router;

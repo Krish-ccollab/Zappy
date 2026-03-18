@@ -1,70 +1,177 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import ChatListItem from '../components/ChatListItem';
 import api from '../api/client';
 import ChatWindow from './ChatWindow';
+import { getSocket } from '../socket/socket';
 import { useAuth } from '../context/AuthContext';
-import { connectSocket } from '../socket/socket';
 
-const ChatDashboard = () => {
-  const [requests, setRequests] = useState([]);
-  const [chats, setChats] = useState([]);
-  const [activeChat, setActiveChat] = useState(null);
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+const ChatDashboard = ({ selectedSearchUser, onSearchHandled, refreshKey }) => {
   const { user } = useAuth();
+  const [chats, setChats] = useState([]);
+  const [activeChatId, setActiveChatId] = useState('');
+  const [messagesByChat, setMessagesByChat] = useState({});
+  const [typingState, setTypingState] = useState(null);
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const [banner, setBanner] = useState('');
 
-  const load = async () => {
-    const [requestRes, chatRes] = await Promise.all([
-      api.get('/chats/requests/received'),
-      api.get('/chats')
-    ]);
-    setRequests(requestRes.data);
-    setChats(chatRes.data);
-  };
+  const activeChat = useMemo(() => chats.find((chat) => chat._id === activeChatId) || null, [activeChatId, chats]);
+  const activeMessages = messagesByChat[activeChatId] || [];
+
+  const loadChats = useCallback(async () => {
+    const { data } = await api.get('/chats');
+    setChats(data);
+    if (!activeChatId && data[0]) {
+      setActiveChatId(data[0]._id);
+    }
+  }, [activeChatId]);
+
+  const loadMessages = useCallback(async (chatId) => {
+    if (!chatId) return;
+    const { data } = await api.get(`/messages/${chatId}`);
+    setMessagesByChat((current) => ({ ...current, [chatId]: data }));
+    getSocket()?.emit('chat:join', chatId);
+  }, []);
 
   useEffect(() => {
-    if (!user?._id) return;
-    connectSocket(user._id);
-    load();
-  }, [user?._id]);
+    loadChats();
+  }, [loadChats, refreshKey]);
 
-  const respond = async (requestId, action) => {
-    await api.patch(`/chats/requests/${requestId}`, { action });
-    load();
-  };
+  useEffect(() => {
+    if (activeChatId) {
+      loadMessages(activeChatId);
+    }
+  }, [activeChatId, loadMessages]);
+
+  useEffect(() => {
+    if (!selectedSearchUser) return;
+    setBanner(`Found @${selectedSearchUser.username}. Send a request from the search page or navbar.`);
+    onSearchHandled?.();
+  }, [selectedSearchUser, onSearchHandled]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return undefined;
+
+    const handleMessage = (message) => {
+      setMessagesByChat((current) => {
+        const existing = current[message.chatId] || [];
+        if (existing.some((item) => item.clientMessageId && item.clientMessageId === message.clientMessageId)) {
+          return current;
+        }
+        return { ...current, [message.chatId]: [...existing, message] };
+      });
+      setChats((current) =>
+        current
+          .map((chat) =>
+            chat._id === message.chatId
+              ? { ...chat, lastMessage: message.message || 'Image', lastMessageAt: message.timestamp }
+              : chat
+          )
+          .sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt))
+      );
+    };
+
+    const handlePresence = ({ userId, isOnline, lastSeen }) => {
+      setChats((current) =>
+        current.map((chat) =>
+          chat.peer?._id === userId
+            ? { ...chat, peer: { ...chat.peer, isOnline, lastSeen: lastSeen || chat.peer.lastSeen } }
+            : chat
+        )
+      );
+    };
+
+    const handleTyping = (payload) => setTypingState(payload);
+
+    socket.on('message:receive', handleMessage);
+    socket.on('presence:update', handlePresence);
+    socket.on('typing:update', handleTyping);
+
+    return () => {
+      socket.off('message:receive', handleMessage);
+      socket.off('presence:update', handlePresence);
+      socket.off('typing:update', handleTyping);
+    };
+  }, []);
+
+  const handleSendMessage = useCallback(async (chat, { text, imageFile }) => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const clientMessageId = `${chat._id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const imageData = imageFile ? await fileToBase64(imageFile) : '';
+
+    await new Promise((resolve) => {
+      socket.emit(
+        'message:send',
+        {
+          chatId: chat._id,
+          message: text,
+          imageData,
+          clientMessageId
+        },
+        (response) => {
+          if (response?.ok && response.message) {
+            setMessagesByChat((current) => ({
+              ...current,
+              [chat._id]: [...(current[chat._id] || []), response.message]
+            }));
+          }
+          resolve(response);
+        }
+      );
+    });
+  }, []);
 
   return (
-    <div className="dashboard-grid">
-      <section className="card">
-        <h2>Incoming Requests</h2>
-        {requests.map((req) => (
-          <article key={req._id} className="list-item">
-            <img src={req.sender.profilePic || 'https://via.placeholder.com/45'} alt={req.sender.username} />
+    <section className="dashboard-shell">
+      {banner && <div className="banner">{banner}</div>}
+      <div className="whatsapp-layout">
+        <aside className={`sidebar-panel ${mobileChatOpen ? 'mobile-hidden' : ''}`}>
+          <div className="sidebar-header">
             <div>
-              <h4>{req.sender.username}</h4>
-              <p>{req.sender.fullName}</p>
+              <h2>Chats</h2>
+              <p>Your conversations and live presence.</p>
             </div>
-            <button onClick={() => respond(req._id, 'accepted')}>Accept</button>
-            <button onClick={() => respond(req._id, 'rejected')}>Reject</button>
-          </article>
-        ))}
-      </section>
-
-      <section className="card">
-        <h2>Your Chats</h2>
-        {chats.map((chat) => {
-          const peer = chat.participants.find((p) => p._id !== user._id);
-          return (
-            <article key={chat._id} className="list-item clickable" onClick={() => setActiveChat(chat)}>
-              <img src={peer?.profilePic || 'https://via.placeholder.com/45'} alt={peer?.username} />
-              <div>
-                <h4>{peer?.username}</h4>
-                <p>{peer?.fullName}</p>
-              </div>
-            </article>
-          );
-        })}
-      </section>
-
-      <ChatWindow chat={activeChat} />
-    </div>
+          </div>
+          <div className="chat-list-scroll">
+            {chats.length === 0 ? (
+              <div className="empty-state">No chats yet. Search for users and send a request to begin.</div>
+            ) : (
+              chats.map((chat) => (
+                <ChatListItem
+                  key={chat._id}
+                  chat={chat}
+                  active={chat._id === activeChatId}
+                  onSelect={(selectedChat) => {
+                    setActiveChatId(selectedChat._id);
+                    setMobileChatOpen(true);
+                  }}
+                />
+              ))
+            )}
+          </div>
+        </aside>
+        <div className={`chat-stage ${mobileChatOpen ? 'mobile-open' : ''}`}>
+          <ChatWindow
+            chat={activeChat}
+            currentUserId={user?._id || ''}
+            messages={activeMessages}
+            onSendMessage={handleSendMessage}
+            typingState={typingState}
+            onBack={() => setMobileChatOpen(false)}
+          />
+        </div>
+      </div>
+    </section>
   );
 };
 

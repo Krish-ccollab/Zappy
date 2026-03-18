@@ -1,88 +1,45 @@
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import cloudinary from '../config/cloudinary.js';
-import OtpVerification from '../models/OtpVerification.js';
-import User from '../models/User.js';
-import { generateOtp } from '../utils/generateOtp.js';
-import { sendOtpEmail } from '../utils/sendOtpEmail.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import {
+  getSessionUser,
+  login,
+  logout,
+  refreshSession,
+  sendOtp,
+  signup,
+  verifyOtp
+} from '../services/authService.js';
 
-const getToken = (payload) => jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
+export const sendOtpController = asyncHandler(async (req, res) => {
+  await sendOtp(req.body);
+  res.json({ message: 'OTP sent successfully.' });
+});
 
-export const sendOtp = async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ message: 'Email is required' });
+export const verifyOtpController = asyncHandler(async (req, res) => {
+  await verifyOtp(req.body);
+  res.json({ message: 'OTP verified successfully.' });
+});
 
-  const existing = await User.findOne({ email });
-  if (existing) return res.status(409).json({ message: 'Email already in use' });
+export const signupController = asyncHandler(async (req, res) => {
+  const session = await signup({ body: req.body, file: req.file, req, res });
+  res.status(201).json(session);
+});
 
-  const otp = generateOtp();
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+export const loginController = asyncHandler(async (req, res) => {
+  const session = await login({ ...req.body, req, res });
+  res.json(session);
+});
 
-  await OtpVerification.findOneAndUpdate({ email }, { otp, expiresAt }, { upsert: true, new: true });
-  await sendOtpEmail(email, otp);
+export const refreshController = asyncHandler(async (req, res) => {
+  const session = await refreshSession({ req, res });
+  res.json(session);
+});
 
-  return res.json({ message: 'OTP sent successfully' });
-};
+export const logoutController = asyncHandler(async (req, res) => {
+  await logout(req, res);
+  res.status(204).send();
+});
 
-export const verifyOtp = async (req, res) => {
-  const { email, otp } = req.body;
-  const record = await OtpVerification.findOne({ email });
-
-  if (!record || record.expiresAt < new Date() || record.otp !== otp) {
-    return res.status(400).json({ message: 'Invalid or expired OTP' });
-  }
-
-  return res.json({ message: 'OTP verified' });
-};
-
-export const signup = async (req, res) => {
-  const { fullName, email, username, password, phone, gender, otp } = req.body;
-
-  if (!fullName || !email || !username || !password || !phone || !gender || !otp) {
-    return res.status(400).json({ message: 'All fields are required' });
-  }
-
-  const record = await OtpVerification.findOne({ email });
-  if (!record || record.expiresAt < new Date() || record.otp !== otp) {
-    return res.status(400).json({ message: 'OTP verification failed' });
-  }
-
-  const exists = await User.findOne({ $or: [{ email }, { username }] });
-  if (exists) return res.status(409).json({ message: 'User already exists' });
-
-  const hashed = await bcrypt.hash(password, 10);
-  let profilePic = '';
-
-  if (req.file) {
-    const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-    const uploaded = await cloudinary.uploader.upload(base64, { folder: 'zappy/profiles' });
-    profilePic = uploaded.secure_url;
-  }
-
-  const user = await User.create({
-    fullName,
-    email,
-    username,
-    password: hashed,
-    profilePic,
-    phone,
-    gender
-  });
-
-  await OtpVerification.deleteOne({ email });
-
-  const token = getToken({ id: user._id, username: user.username });
-  return res.status(201).json({ token, user });
-};
-
-export const login = async (req, res) => {
-  const { username, password } = req.body;
-  const user = await User.findOne({ username });
-  if (!user) return res.status(401).json({ message: 'Invalid credentials' });
-
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) return res.status(401).json({ message: 'Invalid credentials' });
-
-  const token = getToken({ id: user._id, username: user.username });
-  return res.json({ token, user });
-};
+export const meController = asyncHandler(async (req, res) => {
+  const session = await getSessionUser(req.auth.userId);
+  res.json(session);
+});

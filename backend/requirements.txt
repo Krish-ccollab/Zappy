@@ -4,7 +4,14 @@ dotenv
 jsonwebtoken
 bcrypt
 cors
+helmet
+express-rate-limit
+express-validator
+express-mongo-sanitize
+cookie-parser
 nodemailer
 socket.io
 multer
 cloudinary
+morgan
+winston

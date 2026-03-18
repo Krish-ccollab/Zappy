@@ -1,26 +1,12 @@
-import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
+import { useMemo } from 'react';
+import Navbar from './Navbar';
 
-const Layout = ({ children }) => {
-  const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+const Layout = ({ children, requests = [], onRespond, onSearchPick }) => {
+  const safeRequests = useMemo(() => requests || [], [requests]);
 
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <h1>Zappy</h1>
-        <nav>
-          {user && (
-            <>
-              <Link to="/dashboard">Dashboard</Link>
-              <Link to="/search">Search</Link>
-            </>
-          )}
-          <button onClick={toggleTheme}>{theme === 'light' ? 'Dark' : 'Light'} Mode</button>
-          {user && <button onClick={logout}>Logout</button>}
-        </nav>
-      </header>
+      <Navbar requests={safeRequests} onRespond={onRespond} onSearchPick={onSearchPick} />
       <main>{children}</main>
     </div>
   );

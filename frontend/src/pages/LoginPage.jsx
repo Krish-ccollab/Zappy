@@ -6,30 +6,51 @@ import { useAuth } from '../context/AuthContext';
 const LoginPage = () => {
   const [form, setForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const { setSession } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError('');
+
     try {
       const { data } = await api.post('/auth/login', form);
-      login(data);
+      setSession(data);
       navigate('/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Unable to sign in.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <section className="card">
-      <h2>Login</h2>
-      <form onSubmit={handleSubmit} className="form-grid">
-        <input placeholder="Username" onChange={(e) => setForm({ ...form, username: e.target.value })} required />
-        <input type="password" placeholder="Password" onChange={(e) => setForm({ ...form, password: e.target.value })} required />
-        <button type="submit">Login</button>
-      </form>
-      {error && <p className="error">{error}</p>}
-      <p>New user? <Link to="/signup">Create account</Link></p>
+    <section className="auth-shell">
+      <div className="auth-card">
+        <span className="chip">Secure real-time chat</span>
+        <h1>Welcome back to Zappy</h1>
+        <p className="muted-copy">A safer, WhatsApp-inspired chat experience with OTP signup and live updates.</p>
+        <form className="form-grid" onSubmit={handleSubmit}>
+          <input
+            placeholder="Username"
+            value={form.username}
+            onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={form.password}
+            onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+            required
+          />
+          <button type="submit" disabled={loading}>{loading ? 'Signing in...' : 'Login'}</button>
+        </form>
+        {error && <p className="error-text">{error}</p>}
+        <p className="muted-copy">No account yet? <Link to="/signup">Create one</Link></p>
+      </div>
     </section>
   );
 };

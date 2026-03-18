@@ -13,6 +13,13 @@ export const sendOtpEmail = async (email, otp) => {
     from: `Zappy <${process.env.SMTP_EMAIL}>`,
     to: email,
     subject: 'Your Zappy OTP Verification Code',
-    text: `Your OTP code is ${otp}. It will expire in 10 minutes.`
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
+        <h2>Zappy email verification</h2>
+        <p>Your one-time password is:</p>
+        <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">${otp}</p>
+        <p>This code expires in 10 minutes.</p>
+      </div>
+    `
   });
 };

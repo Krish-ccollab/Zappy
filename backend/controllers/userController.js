@@ -1,20 +1,12 @@
-import User from '../models/User.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { getProfile, searchUsers } from '../services/userService.js';
 
-export const getMe = async (req, res) => {
-  const user = await User.findById(req.user.id).select('-password');
-  return res.json(user);
-};
+export const getMeController = asyncHandler(async (req, res) => {
+  const user = await getProfile(req.auth.userId, req.app.locals.onlineUserIds);
+  res.json(user);
+});
 
-export const searchUsers = async (req, res) => {
-  const query = req.query.q?.trim();
-  if (!query) return res.json([]);
-
-  const users = await User.find({
-    username: { $regex: query, $options: 'i' },
-    _id: { $ne: req.user.id }
-  })
-    .select('fullName username profilePic')
-    .limit(20);
-
-  return res.json(users);
-};
+export const searchUsersController = asyncHandler(async (req, res) => {
+  const users = await searchUsers(req.query.q, req.auth.userId, req.app.locals.onlineUserIds);
+  res.json(users);
+});

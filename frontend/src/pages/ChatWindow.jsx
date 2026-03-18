@@ -1,65 +1,108 @@
-import { useEffect, useState } from 'react';
-import api from '../api/client';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import MessageBubble from '../components/MessageBubble';
 import { getSocket } from '../socket/socket';
-import { useAuth } from '../context/AuthContext';
+import { formatLastSeen } from '../utils/formatters';
 
-const ChatWindow = ({ chat }) => {
-  const [messages, setMessages] = useState([]);
+const ChatWindow = ({ chat, currentUserId, onBack, messages, onSendMessage, typingState }) => {
   const [text, setText] = useState('');
-  const { user } = useAuth();
+  const [imageFile, setImageFile] = useState(null);
+  const [sending, setSending] = useState(false);
+  const messageEndRef = useRef(null);
+  const socket = getSocket();
 
   useEffect(() => {
-    if (!chat) return;
-    api.get(`/messages/${chat._id}`).then(({ data }) => setMessages(data));
-  }, [chat]);
+    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, typingState]);
 
-  useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
+  const peer = chat?.peer;
 
-    const handler = (incoming) => {
-      if (incoming.chatId === chat?._id) setMessages((prev) => [...prev, incoming]);
-    };
+  const previewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : ''), [imageFile]);
 
-    socket.on('receive_message', handler);
-    socket.on('message_sent', handler);
-    return () => {
-      socket.off('receive_message', handler);
-      socket.off('message_sent', handler);
-    };
-  }, [chat]);
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
-  const send = async (e) => {
-    e.preventDefault();
-    if (!chat || !text.trim()) return;
-
-    const otherUser = chat.participants.find((p) => p._id !== user._id);
-    getSocket().emit('send_message', {
+  const emitTyping = (isTyping) => {
+    if (!socket || !chat || !peer) return;
+    socket.emit(isTyping ? 'typing:start' : 'typing:stop', {
       chatId: chat._id,
-      sender: user._id,
-      receiver: otherUser?._id,
-      message: text
+      receiverId: peer._id
     });
-
-    setText('');
   };
 
-  if (!chat) return <section className="card">Select a chat to start messaging.</section>;
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!chat || (!text.trim() && !imageFile)) return;
+
+    setSending(true);
+    await onSendMessage(chat, { text, imageFile });
+    setText('');
+    setImageFile(null);
+    emitTyping(false);
+    setSending(false);
+  };
+
+  if (!chat) {
+    return (
+      <section className="chat-panel placeholder-panel">
+        <div>
+          <h2>Zappy Web</h2>
+          <p>Select a chat to start messaging securely.</p>
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <section className="card chat-window">
-      <h3>Chat</h3>
-      <div className="messages">
-        {messages.map((msg) => (
-          <div key={msg._id || msg.timestamp} className={`bubble ${msg.sender === user._id ? 'me' : ''}`}>
-            {msg.message}
-            {msg.image && <img src={msg.image} alt="attachment" />}
-          </div>
+    <section className="chat-panel">
+      <header className="chat-header">
+        <button type="button" className="mobile-back" onClick={onBack}>←</button>
+        <img src={peer?.profilePic || 'https://placehold.co/48x48'} alt={peer?.username} />
+        <div>
+          <strong>{peer?.fullName || peer?.username}</strong>
+          <p>{typingState?.chatId === chat._id && typingState?.isTyping ? 'typing...' : formatLastSeen(peer?.lastSeen, peer?.isOnline)}</p>
+        </div>
+      </header>
+
+      <div className="messages-panel">
+        {messages.map((message) => (
+          <MessageBubble
+            key={message._id || message.clientMessageId}
+            message={message}
+            isMine={message.sender?.toString?.() === currentUserId || message.sender === currentUserId}
+          />
         ))}
+        <div ref={messageEndRef} />
       </div>
-      <form onSubmit={send} className="message-form">
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type message" />
-        <button type="submit">Send</button>
+
+      <form className="message-composer" onSubmit={handleSubmit}>
+        <label className="icon-button upload-button">
+          📎
+          <input
+            hidden
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={(event) => setImageFile(event.target.files?.[0] || null)}
+          />
+        </label>
+        <div className="composer-input-wrap">
+          {previewUrl && (
+            <div className="image-preview-pill">
+              <img src={previewUrl} alt="preview" />
+              <button type="button" className="ghost" onClick={() => setImageFile(null)}>×</button>
+            </div>
+          )}
+          <input
+            value={text}
+            onChange={(event) => {
+              setText(event.target.value);
+              emitTyping(Boolean(event.target.value.trim()));
+            }}
+            onBlur={() => emitTyping(false)}
+            placeholder="Type a message"
+          />
+        </div>
+        <button type="submit" disabled={sending}>{sending ? 'Sending...' : 'Send'}</button>
       </form>
     </section>
   );

@@ -1,18 +1,17 @@
-import jwt from 'jsonwebtoken';
+import { ApiError } from '../utils/apiError.js';
+import { verifyAccessToken } from '../utils/tokens.js';
 
-export const protect = (req, res, next) => {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Unauthorized' });
+export const requireAuth = (req, _res, next) => {
+  const token = req.cookies?.zappy_access;
+
+  if (!token) {
+    return next(new ApiError(401, 'Authentication required.'));
   }
 
-  const token = auth.split(' ')[1];
-
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
+    req.auth = verifyAccessToken(token);
+    return next();
   } catch {
-    return res.status(401).json({ message: 'Invalid token' });
+    return next(new ApiError(401, 'Session expired. Please sign in again.'));
   }
 };

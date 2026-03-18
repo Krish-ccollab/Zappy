@@ -1,37 +1,74 @@
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import PrivateRoute from './components/PrivateRoute';
-import ChatDashboard from './pages/ChatDashboard';
-import LoginPage from './pages/LoginPage';
-import OTPVerificationPage from './pages/OTPVerificationPage';
-import SignupPage from './pages/SignupPage';
-import UserSearchPage from './pages/UserSearchPage';
+import api from './api/client';
+import { useAuth } from './context/AuthContext';
 
-const App = () => (
-  <Layout>
-    <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
-      <Route path="/verify-otp" element={<OTPVerificationPage />} />
-      <Route
-        path="/dashboard"
-        element={
-          <PrivateRoute>
-            <ChatDashboard />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/search"
-        element={
-          <PrivateRoute>
-            <UserSearchPage />
-          </PrivateRoute>
-        }
-      />
-    </Routes>
-  </Layout>
-);
+const ChatDashboard = lazy(() => import('./pages/ChatDashboard'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const OTPVerificationPage = lazy(() => import('./pages/OTPVerificationPage'));
+const SignupPage = lazy(() => import('./pages/SignupPage'));
+const UserSearchPage = lazy(() => import('./pages/UserSearchPage'));
+
+const App = () => {
+  const { isAuthenticated } = useAuth();
+  const [requests, setRequests] = useState([]);
+  const [selectedSearchUser, setSelectedSearchUser] = useState(null);
+  const [chatRefreshKey, setChatRefreshKey] = useState(0);
+
+  const loadRequests = useCallback(async () => {
+    if (!isAuthenticated) {
+      setRequests([]);
+      return;
+    }
+
+    const { data } = await api.get('/chats/requests/received');
+    setRequests(data);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    loadRequests();
+  }, [loadRequests]);
+
+  const handleRespond = async (requestId, action) => {
+    await api.patch(`/chats/requests/${requestId}`, { action });
+    await loadRequests();
+    setChatRefreshKey((value) => value + 1);
+  };
+
+  return (
+    <Layout requests={requests} onRespond={handleRespond} onSearchPick={setSelectedSearchUser}>
+      <Suspense fallback={<div className="screen-center">Loading...</div>}>
+        <Routes>
+          <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/verify-otp" element={<OTPVerificationPage />} />
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute>
+                <ChatDashboard
+                  selectedSearchUser={selectedSearchUser}
+                  onSearchHandled={() => setSelectedSearchUser(null)}
+                  refreshKey={chatRefreshKey}
+                />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/search"
+            element={
+              <PrivateRoute>
+                <UserSearchPage />
+              </PrivateRoute>
+            }
+          />
+        </Routes>
+      </Suspense>
+    </Layout>
+  );
+};
 
 export default App;

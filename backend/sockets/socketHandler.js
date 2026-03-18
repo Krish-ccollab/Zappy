@@ -1,31 +1,113 @@
-import Chat from '../models/Chat.js';
-import Message from '../models/Message.js';
+import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
+import { getUserChats } from '../services/chatService.js';
+import { createMessage } from '../services/messageService.js';
+import { logger } from '../config/logger.js';
 
-const onlineUsers = new Map();
+const socketRooms = new Map();
+const deliveredMessageIds = new Set();
 
-export const setupSocket = (io) => {
-  io.on('connection', (socket) => {
-    socket.on('join', (userId) => {
-      onlineUsers.set(userId, socket.id);
-      socket.userId = userId;
-    });
+const getOnlineUserIds = () => new Set([...socketRooms.keys()]);
 
-    socket.on('send_message', async (payload) => {
-      const { chatId, sender, receiver, message, image = '' } = payload;
-      const chat = await Chat.findById(chatId);
-      if (!chat) return;
+const setUserOnline = (userId, socketId) => {
+  const existing = socketRooms.get(userId) || new Set();
+  existing.add(socketId);
+  socketRooms.set(userId, existing);
+};
 
-      const saved = await Message.create({ chatId, sender, message, image });
-      const receiverSocket = onlineUsers.get(receiver);
+const setUserOffline = async (userId, socketId) => {
+  const sockets = socketRooms.get(userId);
+  if (!sockets) {
+    return false;
+  }
 
-      if (receiverSocket) {
-        io.to(receiverSocket).emit('receive_message', saved);
+  sockets.delete(socketId);
+  if (sockets.size === 0) {
+    socketRooms.delete(userId);
+    await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
+    return true;
+  }
+
+  socketRooms.set(userId, sockets);
+  return false;
+};
+
+export const setupSocket = (io, app) => {
+  io.use((socket, next) => {
+    try {
+      const token = socket.handshake.auth?.token;
+      if (!token) {
+        return next(new Error('Authentication required.'));
       }
-      socket.emit('message_sent', saved);
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      socket.userId = decoded.userId;
+      return next();
+    } catch {
+      return next(new Error('Invalid socket token.'));
+    }
+  });
+
+  io.on('connection', async (socket) => {
+    const userId = socket.userId;
+    setUserOnline(userId, socket.id);
+    app.locals.onlineUserIds = getOnlineUserIds();
+    socket.emit('presence:bootstrap', { onlineUserIds: [...app.locals.onlineUserIds] });
+    socket.broadcast.emit('presence:update', { userId, isOnline: true, lastSeen: null });
+
+    try {
+      const chats = await getUserChats(userId, app.locals.onlineUserIds);
+      chats.forEach((chat) => socket.join(`chat:${chat._id}`));
+    } catch (error) {
+      logger.warn({ message: 'Unable to join chat rooms on connect.', error: error.message });
+    }
+
+    socket.on('message:send', async (payload, callback = () => {}) => {
+      try {
+        const clientMessageId = payload.clientMessageId || `${socket.id}-${Date.now()}`;
+        if (deliveredMessageIds.has(clientMessageId)) {
+          return callback({ ok: true, duplicate: true });
+        }
+
+        const message = await createMessage({
+          chatId: payload.chatId,
+          senderId: userId,
+          text: payload.message || '',
+          imageData: payload.imageData || '',
+          clientMessageId
+        });
+
+        deliveredMessageIds.add(clientMessageId);
+        if (deliveredMessageIds.size > 5000) {
+          const [first] = deliveredMessageIds;
+          deliveredMessageIds.delete(first);
+        }
+
+        io.to(`chat:${payload.chatId}`).emit('message:receive', message);
+        callback({ ok: true, message });
+      } catch (error) {
+        callback({ ok: false, message: error.message });
+      }
     });
 
-    socket.on('disconnect', () => {
-      if (socket.userId) onlineUsers.delete(socket.userId);
+    socket.on('chat:join', (chatId) => {
+      socket.join(`chat:${chatId}`);
+    });
+
+    socket.on('typing:start', ({ chatId, receiverId }) => {
+      socket.to(`chat:${chatId}`).emit('typing:update', { chatId, userId, receiverId, isTyping: true });
+    });
+
+    socket.on('typing:stop', ({ chatId, receiverId }) => {
+      socket.to(`chat:${chatId}`).emit('typing:update', { chatId, userId, receiverId, isTyping: false });
+    });
+
+    socket.on('disconnect', async () => {
+      const becameOffline = await setUserOffline(userId, socket.id);
+      app.locals.onlineUserIds = getOnlineUserIds();
+      if (becameOffline) {
+        socket.broadcast.emit('presence:update', { userId, isOnline: false, lastSeen: new Date().toISOString() });
+      }
     });
   });
 };
