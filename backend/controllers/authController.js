@@ -1,9 +1,12 @@
 import { asyncHandler } from '../utils/asyncHandler.js';
 import {
+  changePassword,
+  forgotPassword,
   getSessionUser,
   login,
   logout,
   refreshSession,
+  resetPassword,
   sendOtp,
   signup,
   verifyOtp
@@ -27,6 +30,21 @@ export const signupController = asyncHandler(async (req, res) => {
 export const loginController = asyncHandler(async (req, res) => {
   const session = await login({ ...req.body, req, res });
   res.json(session);
+});
+
+export const changePasswordController = asyncHandler(async (req, res) => {
+  const result = await changePassword({ userId: req.auth.userId, ...req.body });
+  res.json(result);
+});
+
+export const forgotPasswordController = asyncHandler(async (req, res) => {
+  const result = await forgotPassword(req.body);
+  res.json(result);
+});
+
+export const resetPasswordController = asyncHandler(async (req, res) => {
+  const result = await resetPassword(req.body);
+  res.json(result);
 });
 
 export const refreshController = asyncHandler(async (req, res) => {

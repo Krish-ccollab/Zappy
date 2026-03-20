@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import useDebounce from '../hooks/useDebounce';
+import { getSocket } from '../socket/socket';
 import RequestDropdown from './RequestDropdown';
 
 const Navbar = ({ requests, onRespond }) => {
@@ -18,12 +18,15 @@ const Navbar = ({ requests, onRespond }) => {
   const searchRef = useRef(null);
   const debouncedQuery = useDebounce(query, 300);
   const { user, logout, isAuthenticated } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (!searchRef.current?.contains(event.target)) {
         setSearchOpen(false);
+      }
+      if (!event.target.closest?.('.profile-menu-anchor')) {
+        setMenuOpen(false);
       }
     };
 
@@ -65,6 +68,18 @@ const Navbar = ({ requests, onRespond }) => {
       active = false;
     };
   }, [debouncedQuery, isAuthenticated]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket || !isAuthenticated) return undefined;
+
+    const handleProfileUpdate = (payload) => {
+      setResults((current) => current.map((item) => (item._id === payload._id ? { ...item, ...payload } : item)));
+    };
+
+    socket.on('profile:update', handleProfileUpdate);
+    return () => socket.off('profile:update', handleProfileUpdate);
+  }, [isAuthenticated]);
 
   const sendRequest = async (receiverId) => {
     try {
@@ -142,19 +157,21 @@ const Navbar = ({ requests, onRespond }) => {
             Requests
             {badgeCount > 0 && <span className="badge-dot">{badgeCount}</span>}
           </button>
-          <button type="button" className="icon-button" onClick={toggleTheme}>
-            {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-          </button>
-          <button type="button" className="profile-pill" onClick={() => setMenuOpen((open) => !open)}>
-            {user?.profilePic ? <img src={user.profilePic} alt={user.username} /> : <span>{initials}</span>}
-          </button>
-          {menuOpen && (
-            <div className="dropdown-card profile-dropdown">
-              <strong>{user?.fullName}</strong>
-              <p>@{user?.username}</p>
-              <button type="button" className="ghost" onClick={logout}>Logout</button>
-            </div>
-          )}
+          <div className="profile-menu-anchor">
+            <button type="button" className="profile-pill" onClick={() => setMenuOpen((open) => !open)}>
+              {user?.profilePic ? <img src={user.profilePic} alt={user.username} /> : <span>{initials}</span>}
+            </button>
+            {menuOpen && (
+              <div className="dropdown-card profile-dropdown menu-list">
+                <strong>{user?.fullName}</strong>
+                <p>@{user?.username}</p>
+                <button type="button" className="ghost menu-item" onClick={() => navigate('/profile')}>My Profile</button>
+                <button type="button" className="ghost menu-item" onClick={() => navigate('/profile?tab=password')}>Change Password</button>
+                <button type="button" className="ghost menu-item" onClick={() => navigate('/profile?tab=appearance')}>Appearance</button>
+                <button type="button" className="ghost menu-item" onClick={logout}>Logout</button>
+              </div>
+            )}
+          </div>
           <RequestDropdown open={showRequests} requests={requests} onRespond={onRespond} />
         </div>
       )}

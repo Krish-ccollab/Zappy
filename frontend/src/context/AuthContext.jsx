@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import api from '../api/client';
-import { connectSocket, disconnectSocket } from '../socket/socket';
+import { connectSocket, disconnectSocket, getSocket } from '../socket/socket';
 
 const AuthContext = createContext(null);
 
@@ -15,6 +15,10 @@ export const AuthProvider = ({ children }) => {
     if (payload.socketToken) {
       connectSocket(payload.socketToken);
     }
+  }, []);
+
+  const updateUser = useCallback((nextUser) => {
+    setUser(nextUser);
   }, []);
 
   const clearSession = useCallback(() => {
@@ -43,6 +47,20 @@ export const AuthProvider = ({ children }) => {
     bootstrap();
   }, [applySession, clearSession]);
 
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket || !user?._id) return undefined;
+
+    const handleProfileUpdate = (payload) => {
+      if (payload._id === user._id) {
+        setUser(payload);
+      }
+    };
+
+    socket.on('profile:update', handleProfileUpdate);
+    return () => socket.off('profile:update', handleProfileUpdate);
+  }, [user?._id]);
+
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
@@ -58,10 +76,11 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated: Boolean(user),
       isBootstrapping,
       setSession: applySession,
+      updateUser,
       clearSession,
       logout
     }),
-    [user, socketToken, isBootstrapping, applySession, clearSession, logout]
+    [user, socketToken, isBootstrapping, applySession, updateUser, clearSession, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
