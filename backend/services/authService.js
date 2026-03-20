@@ -17,6 +17,8 @@ import {
 } from '../utils/tokens.js';
 
 const refreshDuration = Number(process.env.REFRESH_TOKEN_MAX_AGE_MS || 7 * 24 * 60 * 60 * 1000);
+const otpDuration = Number(process.env.OTP_MAX_AGE_MS || 5 * 60 * 1000);
+const maxOtpAttempts = Number(process.env.MAX_OTP_ATTEMPTS || 5);
 
 const sanitizeUser = (user) => ({
   _id: user._id,
@@ -29,6 +31,8 @@ const sanitizeUser = (user) => ({
   lastSeen: user.lastSeen,
   createdAt: user.createdAt
 });
+
+const hashPassword = (password) => bcrypt.hash(password, Math.max(10, Number(process.env.BCRYPT_SALT_ROUNDS || 12)));
 
 const issueSession = async (res, user, req) => {
   const accessToken = signAccessToken({ userId: user._id, username: user.username });
@@ -51,29 +55,51 @@ const issueSession = async (res, user, req) => {
   };
 };
 
-export const sendOtp = async ({ email }) => {
-  const existing = await User.findOne({ email });
-  if (existing) {
-    throw new ApiError(409, 'Email is already in use.');
-  }
-
+const upsertOtp = async ({ email, purpose }) => {
   const otp = generateOtp();
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + otpDuration);
 
   await OtpVerification.findOneAndUpdate(
-    { email },
-    { otp, expiresAt, verifiedAt: null, attempts: 0 },
+    { email, purpose },
+    { otp, purpose, expiresAt, verifiedAt: null, attempts: 0 },
     { upsert: true, new: true }
   );
 
   await sendOtpEmail(email, otp);
 };
 
-export const verifyOtp = async ({ email, otp }) => {
-  const record = await OtpVerification.findOne({ email });
+const getOtpRecord = async (email, purpose) => OtpVerification.findOne({ email, purpose });
+
+export const sendOtp = async ({ email, purpose = 'signup' }) => {
+  if (purpose === 'signup') {
+    const existing = await User.findOne({ email });
+    if (existing) {
+      throw new ApiError(409, 'Email is already in use.');
+    }
+  }
+
+  await upsertOtp({ email, purpose });
+};
+
+export const forgotPassword = async ({ email }) => {
+  const user = await User.findOne({ email });
+
+  if (user) {
+    await upsertOtp({ email, purpose: 'password_reset' });
+  }
+
+  return { message: 'If an account exists for that email, an OTP has been sent.' };
+};
+
+export const verifyOtp = async ({ email, otp, purpose = 'signup' }) => {
+  const record = await getOtpRecord(email, purpose);
 
   if (!record || record.expiresAt < new Date()) {
     throw new ApiError(400, 'OTP expired. Please request a new code.');
+  }
+
+  if (record.attempts >= maxOtpAttempts) {
+    throw new ApiError(429, 'Too many OTP attempts. Please request a new code.');
   }
 
   if (record.otp !== otp) {
@@ -88,7 +114,7 @@ export const verifyOtp = async ({ email, otp }) => {
 
 export const signup = async ({ body, file, req, res }) => {
   const { fullName, email, username, password, phone, gender, otp } = body;
-  const otpRecord = await OtpVerification.findOne({ email });
+  const otpRecord = await getOtpRecord(email, 'signup');
 
   if (!otpRecord || otpRecord.expiresAt < new Date() || otpRecord.otp !== otp) {
     throw new ApiError(400, 'OTP verification failed.');
@@ -103,7 +129,6 @@ export const signup = async ({ body, file, req, res }) => {
     throw new ApiError(409, 'A user with that email or username already exists.');
   }
 
-  const hashedPassword = await bcrypt.hash(password, Math.max(10, Number(process.env.BCRYPT_SALT_ROUNDS || 12)));
   let profilePic = '';
 
   if (file) {
@@ -119,13 +144,13 @@ export const signup = async ({ body, file, req, res }) => {
     fullName,
     email,
     username,
-    password: hashedPassword,
+    password: await hashPassword(password),
     profilePic,
     phone,
     gender
   });
 
-  await OtpVerification.deleteOne({ email });
+  await OtpVerification.deleteOne({ email, purpose: 'signup' });
   return issueSession(res, user, req);
 };
 
@@ -144,15 +169,53 @@ export const login = async ({ username, password, req, res }) => {
   return issueSession(res, user, req);
 };
 
+export const changePassword = async ({ userId, oldPassword, newPassword }) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(404, 'User not found.');
+  }
+
+  const isMatch = await bcrypt.compare(oldPassword, user.password);
+  if (!isMatch) {
+    throw new ApiError(400, 'Old password is incorrect.');
+  }
+
+  user.password = await hashPassword(newPassword);
+  await user.save();
+
+  return { message: 'Password updated successfully.' };
+};
+
+export const resetPassword = async ({ email, newPassword, confirmPassword }) => {
+  if (newPassword !== confirmPassword) {
+    throw new ApiError(400, 'Passwords do not match.');
+  }
+
+  const record = await getOtpRecord(email, 'password_reset');
+  if (!record || record.expiresAt < new Date() || !record.verifiedAt) {
+    throw new ApiError(400, 'OTP verification required before password reset.');
+  }
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw new ApiError(400, 'Unable to reset password.');
+  }
+
+  user.password = await hashPassword(newPassword);
+  await user.save();
+  await OtpVerification.deleteOne({ email, purpose: 'password_reset' });
+
+  return { message: 'Password reset successfully.' };
+};
+
 export const refreshSession = async ({ req, res }) => {
   const refreshToken = req.cookies?.zappy_refresh;
   if (!refreshToken) {
     throw new ApiError(401, 'Refresh token is missing.');
   }
 
-  let decoded;
   try {
-    decoded = verifyRefreshToken(refreshToken);
+    verifyRefreshToken(refreshToken);
   } catch {
     throw new ApiError(401, 'Refresh token is invalid.');
   }
@@ -163,7 +226,7 @@ export const refreshSession = async ({ req, res }) => {
   }
 
   await RefreshToken.deleteOne({ _id: storedToken._id });
-  return issueSession(res, storedToken.user, req || { ip: '', get: () => '' }, decoded.userId);
+  return issueSession(res, storedToken.user, req);
 };
 
 export const logout = async (req, res) => {

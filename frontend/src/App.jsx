@@ -6,8 +6,10 @@ import api from './api/client';
 import { useAuth } from './context/AuthContext';
 
 const ChatDashboard = lazy(() => import('./pages/ChatDashboard'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const OTPVerificationPage = lazy(() => import('./pages/OTPVerificationPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const SignupPage = lazy(() => import('./pages/SignupPage'));
 
 const App = () => {
@@ -43,11 +45,20 @@ const App = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/verify-otp" element={<OTPVerificationPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route
             path="/dashboard"
             element={
               <PrivateRoute>
                 <ChatDashboard refreshKey={chatRefreshKey} />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <PrivateRoute>
+                <ProfilePage />
               </PrivateRoute>
             }
           />

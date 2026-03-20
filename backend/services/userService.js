@@ -1,5 +1,19 @@
+import cloudinary from '../config/cloudinary.js';
 import User from '../models/User.js';
 import { ApiError } from '../utils/apiError.js';
+
+export const serializeUser = (user, onlineUserIds = new Set()) => ({
+  _id: user._id,
+  fullName: user.fullName,
+  email: user.email,
+  username: user.username,
+  profilePic: user.profilePic,
+  phone: user.phone,
+  gender: user.gender,
+  lastSeen: user.lastSeen,
+  createdAt: user.createdAt,
+  isOnline: onlineUserIds.has(user._id.toString())
+});
 
 export const getProfile = async (userId, onlineUserIds = new Set()) => {
   const user = await User.findById(userId).select('-password');
@@ -7,10 +21,38 @@ export const getProfile = async (userId, onlineUserIds = new Set()) => {
     throw new ApiError(404, 'User not found.');
   }
 
-  return {
-    ...user.toObject(),
-    isOnline: onlineUserIds.has(userId.toString())
-  };
+  return serializeUser(user, onlineUserIds);
+};
+
+export const updateProfile = async ({ userId, body, file, onlineUserIds = new Set() }) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(404, 'User not found.');
+  }
+
+  if (body.username && body.username !== user.username) {
+    const existingUser = await User.findOne({ username: body.username, _id: { $ne: userId } });
+    if (existingUser) {
+      throw new ApiError(409, 'Username is already taken.');
+    }
+  }
+
+  user.fullName = body.fullName || user.fullName;
+  user.username = body.username || user.username;
+  user.phone = body.phone || user.phone;
+  user.gender = body.gender || user.gender;
+
+  if (file) {
+    const base64 = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+    const uploadResult = await cloudinary.uploader.upload(base64, {
+      folder: 'zappy/profile-pictures',
+      resource_type: 'image'
+    });
+    user.profilePic = uploadResult.secure_url;
+  }
+
+  await user.save();
+  return serializeUser(user, onlineUserIds);
 };
 
 export const searchUsers = async (query, currentUserId, onlineUserIds = new Set()) => {

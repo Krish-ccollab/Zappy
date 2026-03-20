@@ -1,0 +1,178 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import api from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+
+const tabs = ['profile', 'password', 'appearance'];
+
+const ProfilePage = () => {
+  const { user, updateUser } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const { search } = useLocation();
+  const activeTab = useMemo(() => {
+    const tab = new URLSearchParams(search).get('tab') || 'profile';
+    return tabs.includes(tab) ? tab : 'profile';
+  }, [search]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [status, setStatus] = useState('');
+  const [passwordStatus, setPasswordStatus] = useState('');
+  const [profilePic, setProfilePic] = useState(null);
+  const [profileForm, setProfileForm] = useState({
+    fullName: '',
+    username: '',
+    email: '',
+    phone: '',
+    gender: 'other'
+  });
+  const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '' });
+
+  useEffect(() => {
+    if (!user) return;
+    setProfileForm({
+      fullName: user.fullName || '',
+      username: user.username || '',
+      email: user.email || '',
+      phone: user.phone || '',
+      gender: user.gender || 'other'
+    });
+  }, [user]);
+
+  const handleSaveProfile = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setStatus('');
+
+    try {
+      const payload = new FormData();
+      payload.append('fullName', profileForm.fullName);
+      payload.append('username', profileForm.username);
+      payload.append('phone', profileForm.phone);
+      payload.append('gender', profileForm.gender);
+      if (profilePic) payload.append('profilePic', profilePic);
+
+      const { data } = await api.put('/users/update-profile', payload);
+      updateUser(data.user);
+      setStatus('Profile updated successfully.');
+      setIsEditing(false);
+      setProfilePic(null);
+    } catch (error) {
+      setStatus(error.response?.data?.message || 'Unable to update profile.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async (event) => {
+    event.preventDefault();
+    setPasswordLoading(true);
+    setPasswordStatus('');
+
+    try {
+      const { data } = await api.post('/auth/change-password', passwordForm);
+      setPasswordStatus(data.message);
+      setPasswordForm({ oldPassword: '', newPassword: '' });
+    } catch (error) {
+      setPasswordStatus(error.response?.data?.message || 'Unable to change password.');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  return (
+    <section className="page-shell profile-page-shell">
+      <div className="profile-layout">
+        <aside className="profile-sidebar panel-card">
+          <img className="profile-hero-avatar" src={user?.profilePic || 'https://placehold.co/120x120'} alt={user?.username} />
+          <h2>{user?.fullName}</h2>
+          <p>@{user?.username}</p>
+          <nav className="profile-nav-links">
+            <Link className={activeTab === 'profile' ? 'active' : ''} to="/profile">My Profile</Link>
+            <Link className={activeTab === 'password' ? 'active' : ''} to="/profile?tab=password">Change Password</Link>
+            <Link className={activeTab === 'appearance' ? 'active' : ''} to="/profile?tab=appearance">Appearance</Link>
+          </nav>
+        </aside>
+
+        <div className="profile-content panel-card">
+          {activeTab === 'profile' && (
+            <form className="form-grid profile-form" onSubmit={handleSaveProfile}>
+              <div className="profile-section-header">
+                <div>
+                  <h2>My Profile</h2>
+                  <p>Keep your details up to date across chats, headers, and search results.</p>
+                </div>
+                <button type="button" className="ghost" onClick={() => setIsEditing((value) => !value)}>
+                  {isEditing ? 'Cancel' : 'Edit'}
+                </button>
+              </div>
+              <label className="file-field">
+                <span>Profile Picture</span>
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={!isEditing} onChange={(event) => setProfilePic(event.target.files?.[0] || null)} />
+              </label>
+              <input value={profileForm.fullName} disabled={!isEditing} onChange={(event) => setProfileForm((current) => ({ ...current, fullName: event.target.value }))} />
+              <input value={profileForm.username} disabled={!isEditing} onChange={(event) => setProfileForm((current) => ({ ...current, username: event.target.value }))} />
+              <input value={profileForm.email} disabled readOnly />
+              <input value={profileForm.phone} disabled={!isEditing} onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))} />
+              <select value={profileForm.gender} disabled={!isEditing} onChange={(event) => setProfileForm((current) => ({ ...current, gender: event.target.value }))}>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+              {isEditing && <button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</button>}
+              {status && <p className="muted-copy">{status}</p>}
+            </form>
+          )}
+
+          {activeTab === 'password' && (
+            <form className="form-grid profile-form" onSubmit={handleChangePassword}>
+              <div className="profile-section-header">
+                <div>
+                  <h2>Change Password</h2>
+                  <p>Verify your current password before setting a new one.</p>
+                </div>
+              </div>
+              <input
+                type="password"
+                placeholder="Old Password"
+                value={passwordForm.oldPassword}
+                onChange={(event) => setPasswordForm((current) => ({ ...current, oldPassword: event.target.value }))}
+              />
+              <input
+                type="password"
+                placeholder="New Password"
+                value={passwordForm.newPassword}
+                onChange={(event) => setPasswordForm((current) => ({ ...current, newPassword: event.target.value }))}
+              />
+              <button type="submit" disabled={passwordLoading}>{passwordLoading ? 'Updating...' : 'Update Password'}</button>
+              <Link className="inline-link" to="/forgot-password">Forgot Password?</Link>
+              {passwordStatus && <p className="muted-copy">{passwordStatus}</p>}
+            </form>
+          )}
+
+          {activeTab === 'appearance' && (
+            <div className="form-grid profile-form">
+              <div className="profile-section-header">
+                <div>
+                  <h2>Appearance</h2>
+                  <p>Choose how Zappy should look across the app.</p>
+                </div>
+              </div>
+              <div className="appearance-grid">
+                <button type="button" className={`appearance-card ${theme === 'light' ? 'active' : ''}`} onClick={() => setTheme('light')}>
+                  Light Mode
+                </button>
+                <button type="button" className={`appearance-card ${theme === 'dark' ? 'active' : ''}`} onClick={() => setTheme('dark')}>
+                  Dark Mode
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default ProfilePage;
