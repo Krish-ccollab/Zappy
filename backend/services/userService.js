@@ -1,4 +1,4 @@
-import cloudinary from '../config/cloudinary.js';
+import getCloudinary from '../config/cloudinary.js';
 import User from '../models/User.js';
 import { ApiError } from '../utils/apiError.js';
 
@@ -43,6 +43,7 @@ export const updateProfile = async ({ userId, body, file, onlineUserIds = new Se
   user.gender = body.gender || user.gender;
 
   if (file) {
+    const cloudinary = getCloudinary(); // 👈 fix
     const base64 = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
     const uploadResult = await cloudinary.uploader.upload(base64, {
       folder: 'zappy/profile-pictures',
