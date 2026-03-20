@@ -95,34 +95,29 @@ const ChatDashboard = ({ refreshKey }) => {
     };
   }, []);
 
-  const handleSendMessage = useCallback(async (chat, { text, imageFile }) => {
-    const socket = getSocket();
-    if (!socket) return;
+const handleSendMessage = useCallback(async (chat, { text, imageFile }) => {
+  const socket = getSocket();
+  if (!socket) return;
 
-    const clientMessageId = `${chat._id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const imageData = imageFile ? await fileToBase64(imageFile) : '';
+  const clientMessageId = `${chat._id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const imageData = imageFile ? await fileToBase64(imageFile) : '';
 
-    await new Promise((resolve) => {
-      socket.emit(
-        'message:send',
-        {
-          chatId: chat._id,
-          message: text,
-          imageData,
-          clientMessageId
-        },
-        (response) => {
-          if (response?.ok && response.message) {
-            setMessagesByChat((current) => ({
-              ...current,
-              [chat._id]: [...(current[chat._id] || []), response.message]
-            }));
-          }
-          resolve(response);
-        }
-      );
-    });
-  }, []);
+  await new Promise((resolve) => {
+    socket.emit(
+      'message:send',
+      {
+        chatId: chat._id,
+        message: text,
+        imageData,
+        clientMessageId
+      },
+      (response) => {
+        // 👇 State update hatao — message:receive event handle karega
+        resolve(response);
+      }
+    );
+  });
+}, []);
 
   return (
     <section className="dashboard-shell">

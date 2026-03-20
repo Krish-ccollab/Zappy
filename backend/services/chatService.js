@@ -10,13 +10,13 @@ const buildPeer = (chat, currentUserId, onlineUserIds) => {
     ...chat,
     peer: peer
       ? {
-          _id: peer._id,
-          username: peer.username,
-          fullName: peer.fullName,
-          profilePic: peer.profilePic,
-          lastSeen: peer.lastSeen,
-          isOnline: onlineUserIds.has(peer._id.toString())
-        }
+        _id: peer._id,
+        username: peer.username,
+        fullName: peer.fullName,
+        profilePic: peer.profilePic,
+        lastSeen: peer.lastSeen,
+        isOnline: onlineUserIds.has(peer._id.toString())
+      }
       : null
   };
 };
@@ -62,11 +62,19 @@ export const respondToRequest = async (requestId, currentUserId, action) => {
 
   let chat = null;
   if (action === 'accepted') {
-    chat = await Chat.findOneAndUpdate(
-      { participants: { $all: [request.sender._id, request.receiver._id], $size: 2 } },
-      { $setOnInsert: { participants: [request.sender._id, request.receiver._id] } },
-      { upsert: true, new: true }
-    ).populate('participants', 'username fullName profilePic lastSeen');
+    const senderId = request.sender._id;
+    const receiverId = request.receiver._id;
+
+    // 👇 Pehle dhundo
+    chat = await Chat.findOne({
+      participants: { $all: [senderId, receiverId], $size: 2 }
+    }).populate('participants', 'username fullName profilePic lastSeen');
+
+    // 👇 Nahi mila toh banao
+    if (!chat) {
+      chat = await Chat.create({ participants: [senderId, receiverId] });
+      chat = await chat.populate('participants', 'username fullName profilePic lastSeen');
+    }
   }
 
   return { request, chat };
