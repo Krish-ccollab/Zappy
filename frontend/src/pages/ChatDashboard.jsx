@@ -84,14 +84,24 @@ const ChatDashboard = ({ refreshKey }) => {
 
     const handleTyping = (payload) => setTypingState(payload);
 
+    const handleProfileUpdate = (payload) => {
+      setChats((current) =>
+        current.map((chat) =>
+          chat.peer?._id === payload._id ? { ...chat, peer: { ...chat.peer, ...payload } } : chat
+        )
+      );
+    };
+
     socket.on('message:receive', handleMessage);
     socket.on('presence:update', handlePresence);
     socket.on('typing:update', handleTyping);
+    socket.on('profile:update', handleProfileUpdate);
 
     return () => {
       socket.off('message:receive', handleMessage);
       socket.off('presence:update', handlePresence);
       socket.off('typing:update', handleTyping);
+      socket.off('profile:update', handleProfileUpdate);
     };
   }, []);
 

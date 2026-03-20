@@ -38,6 +38,7 @@ const io = new Server(server, {
   pingInterval: 10000
 });
 
+app.locals.io = io;
 setupSocket(io, app);
 
 const PORT = process.env.PORT || 5000;

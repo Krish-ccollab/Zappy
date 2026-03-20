@@ -147,6 +147,8 @@ VITE_SOCKET_URL=http://localhost:5000
 - `AUTH_RATE_LIMIT_MAX`: Maximum login/signup/OTP attempts per window.
 - `ACCESS_TOKEN_MAX_AGE_MS`: Lifetime of the access token cookie.
 - `REFRESH_TOKEN_MAX_AGE_MS`: Lifetime of the refresh token cookie.
+- `OTP_MAX_AGE_MS`: OTP lifetime in milliseconds.
+- `MAX_OTP_ATTEMPTS`: Maximum failed OTP verification attempts before requiring a new code.
 - `MAX_UPLOAD_SIZE_BYTES`: Max upload size in bytes.
 - `LOG_LEVEL`: Winston log level.
 - `SMTP_EMAIL`: Gmail address used to send OTP emails.
@@ -212,8 +214,8 @@ All major auth, chat request, and messaging routes validate request data with `e
 - Zappy logo.
 - Search bar with debounce, live dropdown results, and inline request actions.
 - Chat requests dropdown with red badge counter.
-- Theme toggle.
-- Profile menu.
+- Profile menu with My Profile, Change Password, Appearance, and Logout.
+- Theme selection moved into Appearance settings and persisted globally.
 
 ## Real-Time Features
 - Message send -> Socket.IO -> backend save -> room emit.
@@ -229,9 +231,11 @@ All major auth, chat request, and messaging routes validate request data with `e
 - Cloudinary profile pictures.
 - Cloudinary image messages.
 - Username search.
+- Editable profile page with Cloudinary avatar updates.
+- Change password and forgot-password OTP reset flow.
 - Chat request accept/reject flow.
 - Protected chat-only messaging.
-- Dark and light mode toggle.
+- Dark and light mode toggle via Appearance settings.
 
 ## Deployment Guide
 
@@ -264,8 +268,12 @@ All major auth, chat request, and messaging routes validate request data with `e
 - `POST /api/auth/login`
 - `POST /api/auth/refresh`
 - `POST /api/auth/logout`
+- `POST /api/auth/change-password`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
 - `GET /api/auth/me`
 - `GET /api/users/search?query=username`
+- `PUT /api/users/update-profile`
 - `POST /api/chats/requests`
 - `GET /api/chats/requests/received`
 - `PATCH /api/chats/requests/:requestId`
