@@ -3,11 +3,12 @@ import ChatRequest from '../models/ChatRequest.js';
 import Message from '../models/Message.js';
 import { ApiError } from '../utils/apiError.js';
 
-const buildPeer = (chat, currentUserId, onlineUserIds) => {
-  const peer = chat.participants.find((participant) => participant._id.toString() !== currentUserId.toString());
+export const serializeChatForUser = (chat, currentUserId, onlineUserIds = new Set()) => {
+  const normalizedChat = chat.toObject ? chat.toObject() : chat;
+  const peer = normalizedChat.participants.find((participant) => participant._id.toString() !== currentUserId.toString());
 
   return {
-    ...chat,
+    ...normalizedChat,
     peer: peer
       ? {
         _id: peer._id,
@@ -27,8 +28,13 @@ export const createChatRequest = async (senderId, receiverId) => {
   }
 
   const [existingRequest, existingChat] = await Promise.all([
-    ChatRequest.findOne({ sender: senderId, receiver: receiverId }),
-    Chat.findOne({ participants: { $all: [senderId, receiverId], $size: 2 } })
+    ChatRequest.findOne({
+      $or: [
+        { sender: senderId, receiver: receiverId, status: 'pending' },
+        { sender: receiverId, receiver: senderId, status: 'pending' }
+      ]
+    }),
+    Chat.findOne({ participants: { $all: [senderId, receiverId], $size: 2 }, isActive: true })
   ]);
 
   if (existingRequest) {
@@ -65,15 +71,19 @@ export const respondToRequest = async (requestId, currentUserId, action) => {
     const senderId = request.sender._id;
     const receiverId = request.receiver._id;
 
-    // 👇 Pehle dhundo
+    // Pehle dhundo
     chat = await Chat.findOne({
       participants: { $all: [senderId, receiverId], $size: 2 }
     }).populate('participants', 'username fullName profilePic lastSeen');
 
-    // 👇 Nahi mila toh banao
     if (!chat) {
-      chat = await Chat.create({ participants: [senderId, receiverId] });
+      // Nahi mila toh banao
+      chat = await Chat.create({ participants: [senderId, receiverId], isActive: true });
       chat = await chat.populate('participants', 'username fullName profilePic lastSeen');
+    } else if (!chat.isActive) {
+      // Tha but inactive tha — reactivate karo
+      chat.isActive = true;
+      await chat.save();
     }
   }
 
@@ -81,22 +91,51 @@ export const respondToRequest = async (requestId, currentUserId, action) => {
 };
 
 export const getUserChats = async (userId, onlineUserIds = new Set()) => {
-  const chats = await Chat.find({ participants: userId })
+  const chats = await Chat.find({ participants: userId, isActive: true })
     .populate('participants', 'username fullName profilePic lastSeen')
     .sort({ lastMessageAt: -1 })
     .lean();
 
-  return chats.map((chat) => buildPeer(chat, userId, onlineUserIds));
+  return chats.map((chat) => serializeChatForUser(chat, userId, onlineUserIds));
 };
 
 export const ensureChatParticipant = async (chatId, userId) => {
-  const chat = await Chat.findById(chatId);
+  const chat = await Chat.findOne({ _id: chatId, isActive: true });
 
   if (!chat || !chat.participants.some((participant) => participant.toString() === userId.toString())) {
     throw new ApiError(403, 'You do not have access to this chat.');
   }
 
   return chat;
+};
+
+export const removeFriend = async (chatId, currentUserId) => {
+  const chat = await Chat.findById(chatId).populate('participants', 'username fullName profilePic lastSeen');
+
+  if (!chat || !chat.isActive) {
+    throw new ApiError(404, 'Chat not found.');
+  }
+
+  if (!chat.participants.some((participant) => participant._id.toString() === currentUserId.toString())) {
+    throw new ApiError(403, 'You do not have access to this chat.');
+  }
+
+  chat.isActive = false;
+  await chat.save();
+
+  const participantIds = chat.participants.map((participant) => participant._id.toString());
+  await ChatRequest.deleteMany({
+    $or: [
+      { sender: participantIds[0], receiver: participantIds[1] },
+      { sender: participantIds[1], receiver: participantIds[0] }
+    ]
+  });
+
+  return {
+    chat,
+    chatId: chat._id.toString(),
+    participantIds
+  };
 };
 
 export const getLastMessagePreview = async (chatId) => {
