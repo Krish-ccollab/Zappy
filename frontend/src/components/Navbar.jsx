@@ -113,7 +113,7 @@ const Navbar = ({ requests, onRespond }) => {
           <span className="brand-mark">Z</span>
           <span className="brand-copy">
             <strong>Zappy</strong>
-            <small>Real-time chat, refined</small>
+            <small>The new way to connect.</small>
           </span>
         </Link>
         {isAuthenticated && (
