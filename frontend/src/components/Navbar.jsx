@@ -16,6 +16,7 @@ const Navbar = ({ requests, onRespond }) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchMessage, setSearchMessage] = useState('');
   const searchRef = useRef(null);
+  const requestRef = useRef(null);
   const debouncedQuery = useDebounce(query, 300);
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -27,6 +28,9 @@ const Navbar = ({ requests, onRespond }) => {
       }
       if (!event.target.closest?.('.profile-menu-anchor')) {
         setMenuOpen(false);
+      }
+      if (!requestRef.current?.contains(event.target)) {
+        setShowRequests(false);
       }
     };
 
@@ -105,9 +109,16 @@ const Navbar = ({ requests, onRespond }) => {
   return (
     <header className="topbar whatsapp-bar">
       <div className="brand-wrap">
-        <Link to={isAuthenticated ? '/dashboard' : '/login'} className="brand-link">Zappy</Link>
+        <Link to={isAuthenticated ? '/dashboard' : '/login'} className="brand-link">
+          <span className="brand-mark">Z</span>
+          <span className="brand-copy">
+            <strong>Zappy</strong>
+            <small>Real-time chat, refined</small>
+          </span>
+        </Link>
         {isAuthenticated && (
           <div className="navbar-search" ref={searchRef}>
+            <span className="navbar-search__icon" aria-hidden="true">⌕</span>
             <input
               value={query}
               onChange={(event) => {
@@ -117,7 +128,7 @@ const Navbar = ({ requests, onRespond }) => {
               onFocus={() => {
                 if (query.trim() || results.length) setSearchOpen(true);
               }}
-              placeholder="Search users..."
+              placeholder="Search people..."
               aria-label="Search users"
             />
             {searchOpen && (query.trim() || isSearching || searchMessage) && (
@@ -153,10 +164,14 @@ const Navbar = ({ requests, onRespond }) => {
 
       {isAuthenticated && (
         <div className="nav-actions">
-          <button type="button" className="icon-button" onClick={() => setShowRequests((open) => !open)}>
-            Requests
-            {badgeCount > 0 && <span className="badge-dot">{badgeCount}</span>}
-          </button>
+          <div className="nav-popover-group" ref={requestRef}>
+            <button type="button" className="icon-button nav-action-button" onClick={() => setShowRequests((open) => !open)}>
+              <span aria-hidden="true">✉️</span>
+              <span>Requests</span>
+              {badgeCount > 0 && <span className="badge-dot">{badgeCount}</span>}
+            </button>
+            <RequestDropdown open={showRequests} requests={requests} onRespond={onRespond} />
+          </div>
           <div className="profile-menu-anchor">
             <button type="button" className="profile-pill" onClick={() => setMenuOpen((open) => !open)}>
               {user?.profilePic ? <img src={user.profilePic} alt={user.username} /> : <span>{initials}</span>}
@@ -172,7 +187,6 @@ const Navbar = ({ requests, onRespond }) => {
               </div>
             )}
           </div>
-          <RequestDropdown open={showRequests} requests={requests} onRespond={onRespond} />
         </div>
       )}
     </header>

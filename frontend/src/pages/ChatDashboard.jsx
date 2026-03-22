@@ -42,6 +42,7 @@ const ChatDashboard = ({ refreshKey }) => {
 
   const activeChat = useMemo(() => chats.find((chat) => chat._id === activeChatId) || null, [activeChatId, chats]);
   const activeMessages = messagesByChat[activeChatId] || [];
+  const onlineCount = useMemo(() => chats.filter((chat) => chat.peer?.isOnline).length, [chats]);
 
   const loadChats = useCallback(async () => {
     const { data } = await api.get('/chats');
@@ -321,7 +322,11 @@ const handleSendMessage = useCallback(async (chat, { text, imageFile }) => {
           <div className="sidebar-header sidebar-header-stack">
             <div>
               <h2>Chats</h2>
-              <p>Your conversations and live presence.</p>
+              <p>{user?.fullName ? `Welcome back, ${user.fullName.split(' ')[0]}.` : 'Your conversations and live presence.'}</p>
+            </div>
+            <div className="sidebar-insights" aria-label="Chat summary">
+              <span>{chats.length} chats</span>
+              <span>{onlineCount} online</span>
             </div>
             {feedbackMessage && <span className="status-toast">{feedbackMessage}</span>}
           </div>
