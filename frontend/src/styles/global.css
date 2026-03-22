@@ -133,7 +133,7 @@ img {
 .app-main {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .topbar {
@@ -369,6 +369,7 @@ img {
 .search-dropdown {
   left: 0;
   right: auto;
+  z-index: 100;
 }
 
 .request-dropdown {
@@ -1116,6 +1117,9 @@ img {
   min-height: 100%;
   padding-bottom: 20px;
   overflow: auto;
+  /* ye pehle se hai ✅ */
+  align-items: flex-start;
+  /* 👈 ye add karo */
 }
 
 .auth-card {
@@ -1353,8 +1357,15 @@ img {
 }
 
 @media (max-width: 768px) {
+
+  body {
+    overflow: hidden auto;
+    /* 👈 ye change karo */
+  }
+
   .app-shell {
     padding: 0;
+    height: 100dvh
   }
 
   .topbar {
@@ -1439,6 +1450,9 @@ img {
   }
 
   .message-composer {
+    padding: 14px 16px env(safe-area-inset-bottom, 16px);
+    position: sticky;
+    bottom: 0;
     gap: 10px;
     padding: 14px 16px calc(18px + env(safe-area-inset-bottom, 0px));
   }
