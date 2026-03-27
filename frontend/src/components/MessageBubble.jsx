@@ -12,11 +12,6 @@ const MessageBubble = memo(
   ({
     message,
     isMine,
-    isEditing,
-    editValue,
-    onEditChange,
-    onEditCancel,
-    onEditSave,
     onOpenActions,
     onOpenImageViewer
   }) => {
@@ -30,16 +25,17 @@ const MessageBubble = memo(
       }
     };
 
+    const metaInfo = `${formatTime(message.timestamp)}${isMine ? ' ✓✓' : ''}`;
+    const shouldShowMetaLine = !message.image || Boolean(message.message);
+
     return (
       <article
-        className={`message-bubble ${isMine ? 'mine' : ''} ${message.isDeleted ? 'deleted' : ''} ${isEditing ? 'editing' : ''}`}
+        className={`message-bubble ${isMine ? 'mine' : ''} ${message.isDeleted ? 'deleted' : ''}`}
         onContextMenu={(event) => {
-          if (isEditing) return;
           event.preventDefault();
           openActions();
         }}
         onTouchStart={() => {
-          if (isEditing) return;
           clearLongPress();
           longPressTimerRef.current = window.setTimeout(() => {
             openActions();
@@ -53,30 +49,14 @@ const MessageBubble = memo(
         <button type="button" className="message-menu-button" aria-label="Message actions" onClick={openActions}>
           ⋮
         </button>
-        {message.image && <ChatImage src={message.image} alt="attachment" onOpenViewer={onOpenImageViewer} />}
-        {isEditing ? (
-          <div className="message-edit-box">
-            <span className="message-edit-label">Editing message…</span>
-            <input
-              className="message-edit-input"
-              value={editValue}
-              onChange={(event) => onEditChange(event.target.value)}
-              maxLength={5000}
-              autoFocus
-            />
-            <div className="message-edit-actions">
-              <button type="button" className="ghost edit-cancel-button" onClick={onEditCancel}>Cancel</button>
-              <button type="button" className="edit-save-button" onClick={onEditSave}>Save</button>
-            </div>
-          </div>
-        ) : (
-          message.message && <p className={message.isDeleted ? 'message-deleted-copy' : ''}>{message.message}</p>
+        {message.image && <ChatImage src={message.image} alt="attachment" metaInfo={metaInfo} onOpenViewer={onOpenImageViewer} />}
+        {message.message && <p className={message.isDeleted ? 'message-deleted-copy' : ''}>{message.message}</p>}
+        {shouldShowMetaLine && (
+          <span className="message-meta-line">
+            {message.isEdited && !message.isDeleted && <em>(edited)</em>}
+            <span>{metaInfo}</span>
+          </span>
         )}
-        <span className="message-meta-line">
-          {message.isEdited && !message.isDeleted && <em>(edited)</em>}
-          {formatTime(message.timestamp)}
-          {isMine && <TickIcon status={message.status} />}
-        </span>
       </article>
     );
   }

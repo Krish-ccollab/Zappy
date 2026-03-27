@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import EditMessageModal from '../components/EditMessageModal';
 import ImageViewerModal from '../components/ImageViewerModal';
 import MessageActionModal from '../components/MessageActionModal';
 import MessageBubble from '../components/MessageBubble';
@@ -119,6 +120,11 @@ const ChatWindow = ({
       setEditingValue('');
     }
   }, [editingMessageId, messages]);
+
+  const editingMessage = useMemo(
+    () => messages.find((message) => message._id === editingMessageId) || null,
+    [editingMessageId, messages]
+  );
 
   const openNotice = (message) => {
     setActionMessage(null);
@@ -248,15 +254,7 @@ const ChatWindow = ({
             <MessageBubble
               key={item.key}
               message={item.value}
-              isMine={isMine(item.value)}
-              isEditing={editingMessageId === item.value._id}
-              editValue={editingValue}
-              onEditChange={setEditingValue}
-              onEditCancel={() => {
-                setEditingMessageId('');
-                setEditingValue('');
-              }}
-              onEditSave={handleSaveEdit}
+              isMine={item.value.sender?.toString?.() === currentUserId || item.value.sender === currentUserId}
               onOpenActions={setActionMessage}
               onOpenImageViewer={setViewerImage}
             />
@@ -322,6 +320,17 @@ const ChatWindow = ({
       </form>
 
       <ImageViewerModal image={viewerImage} onClose={() => setViewerImage(null)} />
+      <EditMessageModal
+        open={Boolean(editingMessage)}
+        value={editingValue}
+        originalMessage={editingMessage?.message || ''}
+        onChange={setEditingValue}
+        onCancel={() => {
+          setEditingMessageId('');
+          setEditingValue('');
+        }}
+        onSave={handleSaveEdit}
+      />
       <MessageActionModal
         open={Boolean(actionMessage)}
         title="Message actions"
