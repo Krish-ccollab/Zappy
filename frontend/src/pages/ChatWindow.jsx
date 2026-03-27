@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import EditMessageModal from '../components/EditMessageModal';
 import ImageViewerModal from '../components/ImageViewerModal';
 import MessageActionModal from '../components/MessageActionModal';
 import MessageBubble from '../components/MessageBubble';
@@ -94,6 +95,11 @@ const ChatWindow = ({ chat, currentUserId, onBack, messages, onSendMessage, onEd
       setEditingValue('');
     }
   }, [editingMessageId, messages]);
+
+  const editingMessage = useMemo(
+    () => messages.find((message) => message._id === editingMessageId) || null,
+    [editingMessageId, messages]
+  );
 
   const openNotice = (message) => {
     setActionMessage(null);
@@ -225,14 +231,6 @@ const ChatWindow = ({ chat, currentUserId, onBack, messages, onSendMessage, onEd
               key={item.key}
               message={item.value}
               isMine={item.value.sender?.toString?.() === currentUserId || item.value.sender === currentUserId}
-              isEditing={editingMessageId === item.value._id}
-              editValue={editingValue}
-              onEditChange={setEditingValue}
-              onEditCancel={() => {
-                setEditingMessageId('');
-                setEditingValue('');
-              }}
-              onEditSave={handleSaveEdit}
               onOpenActions={setActionMessage}
               onOpenImageViewer={setViewerImage}
             />
@@ -297,6 +295,17 @@ const ChatWindow = ({ chat, currentUserId, onBack, messages, onSendMessage, onEd
       </form>
 
       <ImageViewerModal image={viewerImage} onClose={() => setViewerImage(null)} />
+      <EditMessageModal
+        open={Boolean(editingMessage)}
+        value={editingValue}
+        originalMessage={editingMessage?.message || ''}
+        onChange={setEditingValue}
+        onCancel={() => {
+          setEditingMessageId('');
+          setEditingValue('');
+        }}
+        onSave={handleSaveEdit}
+      />
       <MessageActionModal
         open={Boolean(actionMessage)}
         title="Message actions"

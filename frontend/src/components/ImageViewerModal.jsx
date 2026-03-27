@@ -116,7 +116,7 @@ const ImageViewerModal = ({ image, onClose }) => {
           <button type="button" className="ghost" onClick={handleDownload}>Download</button>
           <div className="image-viewer-toolbar__actions">
             <button type="button" className="ghost" onClick={resetView}>Reset</button>
-            <button type="button" className="ghost" onClick={onClose}>✕</button>
+            <button type="button" className="ghost image-viewer-close" onClick={onClose}>✕</button>
           </div>
         </div>
         <div
