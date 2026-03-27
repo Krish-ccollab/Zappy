@@ -33,7 +33,7 @@ const SignupPage = () => {
   return (
     <section className="auth-shell">
       <div className="auth-card large">
-        <span className="chip">OTP signup + Cloudinary avatar</span>
+        <span className="chip">Quick & Secure Signup</span>
         <h1>Create your Zappy account</h1>
         <form className="form-grid two-columns" onSubmit={handleSubmit}>
           <label className="form-field">
@@ -50,7 +50,7 @@ const SignupPage = () => {
           </label>
           <label className="form-field">
             <input type="password" placeholder="Create a strong password" value={form.password} onChange={updateField('password')} required />
-            <small className="field-hint">Use at least 6–8 characters for better security.</small>
+            <small className="field-hint">Use 6–8 characters with at least one uppercase letter, number, and special symbol (*, @, $).</small>
           </label>
           <label className="form-field">
             <input placeholder="Enter your phone number" value={form.phone} onChange={updateField('phone')} required />
@@ -66,7 +66,7 @@ const SignupPage = () => {
               <option value="male">Male</option>
               <option value="female">Female</option>
             </select>
-            <small className="field-hint">Choose the option you are most comfortable with.</small>
+            <small className="field-hint">Choose Your Gender.</small>
           </label>
           <label className="file-field">
             <span>Profile Picture</span>
