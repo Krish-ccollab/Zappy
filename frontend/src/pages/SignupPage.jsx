@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../api/client';
+import useDebounce from '../hooks/useDebounce';
 
 const initialForm = {
   fullName: '',
@@ -14,6 +16,8 @@ const initialForm = {
 const SignupPage = () => {
   const [form, setForm] = useState(initialForm);
   const [profilePic, setProfilePic] = useState(null);
+  const [usernameStatus, setUsernameStatus] = useState({ state: 'idle', message: '' });
+  const debouncedUsername = useDebounce(form.username, 350);
   const navigate = useNavigate();
 
   const updateField = (field) => (event) => {
@@ -25,8 +29,49 @@ const SignupPage = () => {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
+  useEffect(() => {
+    const username = debouncedUsername.trim();
+    if (!username) {
+      setUsernameStatus({ state: 'idle', message: '' });
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_.]+$/.test(username) || username.length < 3 || username.length > 30) {
+      setUsernameStatus({
+        state: 'invalid',
+        message: 'Username must be 3-30 chars and only use letters, numbers, underscores, or periods.'
+      });
+      return;
+    }
+
+    let active = true;
+    setUsernameStatus({ state: 'checking', message: 'Checking username availability...' });
+
+    api
+      .get(`/auth/username-availability?username=${encodeURIComponent(username)}`)
+      .then(({ data }) => {
+        if (!active) return;
+        setUsernameStatus(
+          data.available
+            ? { state: 'available', message: 'Username available.' }
+            : { state: 'taken', message: 'Username already taken.' }
+        );
+      })
+      .catch(() => {
+        if (!active) return;
+        setUsernameStatus({ state: 'error', message: 'Unable to check username right now.' });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [debouncedUsername]);
+
   const handleSubmit = (event) => {
     event.preventDefault();
+    if (usernameStatus.state === 'taken' || usernameStatus.state === 'checking' || usernameStatus.state === 'invalid') {
+      return;
+    }
     navigate('/verify-otp', { state: { form, profilePic } });
   };
 
@@ -47,6 +92,9 @@ const SignupPage = () => {
           <label className="form-field">
             <input placeholder="Choose a unique username" value={form.username} onChange={updateField('username')} required />
             <small className="field-hint">Only letters, numbers, underscores allowed.</small>
+            {usernameStatus.message && (
+              <small className={`username-status ${usernameStatus.state}`}>{usernameStatus.message}</small>
+            )}
           </label>
           <label className="form-field">
             <input type="password" placeholder="Create a strong password" value={form.password} onChange={updateField('password')} required />
@@ -78,7 +126,13 @@ const SignupPage = () => {
             <p>Zappy will send a 6-digit code to your email and only create the account after verification.</p>
             <p>Selected image: {profilePic?.name || 'No image selected'}</p>
           </div>
-          <button type="submit" className="full-width">Continue to OTP verification</button>
+          <button
+            type="submit"
+            className="full-width"
+            disabled={usernameStatus.state === 'taken' || usernameStatus.state === 'checking' || usernameStatus.state === 'invalid'}
+          >
+            Continue to OTP verification
+          </button>
         </form>
       </div>
     </section>

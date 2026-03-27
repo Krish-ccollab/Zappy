@@ -4,6 +4,7 @@ import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import useDebounce from '../hooks/useDebounce';
 import { getSocket } from '../socket/socket';
+import { getUserAvatar } from '../utils/avatar';
 import RequestDropdown from './RequestDropdown';
 
 const Navbar = ({ requests, onRespond }) => {
@@ -168,7 +169,10 @@ const Navbar = ({ requests, onRespond }) => {
 
                   return (
                     <article key={result._id} className="search-result-card">
-                      <img src={result.profilePic || 'https://placehold.co/48x48'} alt={result.username} />
+                      <img
+                        src={getUserAvatar({ profilePic: result.profilePic, fullName: result.fullName, username: result.username })}
+                        alt={result.username}
+                      />
                       <div className="search-result-copy">
                         <strong>@{result.username}</strong>
                         <p>{result.fullName}</p>
@@ -203,7 +207,10 @@ const Navbar = ({ requests, onRespond }) => {
           </div>
           <div className="profile-menu-anchor">
             <button type="button" className="profile-pill" onClick={() => setMenuOpen((open) => !open)}>
-              {user?.profilePic ? <img src={user.profilePic} alt={user.username} /> : <span>{initials}</span>}
+              <img
+                src={getUserAvatar({ profilePic: user?.profilePic, fullName: user?.fullName, username: user?.username })}
+                alt={user?.username || initials}
+              />
             </button>
             {menuOpen && (
               <div className="dropdown-card profile-dropdown menu-list">

@@ -3,6 +3,7 @@ import ImageViewerModal from '../components/ImageViewerModal';
 import MessageActionModal from '../components/MessageActionModal';
 import MessageBubble from '../components/MessageBubble';
 import { getSocket } from '../socket/socket';
+import { getUserAvatar } from '../utils/avatar';
 import { formatDateSeparator, formatLastSeen } from '../utils/formatters';
 
 const TYPING_STOP_DELAY = 1500;
@@ -229,7 +230,10 @@ const ChatWindow = ({
     <section className="chat-panel">
       <header className="chat-header">
         <button type="button" className="mobile-back" onClick={onBack}>←</button>
-        <img src={peer?.profilePic || 'https://placehold.co/48x48'} alt={peer?.username} />
+        <img
+          src={getUserAvatar({ profilePic: peer?.profilePic, fullName: peer?.fullName, username: peer?.username })}
+          alt={peer?.username}
+        />
         <div>
           <strong>{peer?.fullName || peer?.username}</strong>
           <p>{formatLastSeen(peer?.lastSeen, peer?.isOnline)}</p>

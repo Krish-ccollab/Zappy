@@ -31,15 +31,17 @@ export const updateProfile = async ({ userId, body, file, onlineUserIds = new Se
     throw new ApiError(404, 'User not found.');
   }
 
-  if (body.username && body.username !== user.username) {
-    const existingUser = await User.findOne({ username: body.username, _id: { $ne: userId } });
+  const normalizedUsername = body.username?.trim().toLowerCase();
+
+  if (normalizedUsername && normalizedUsername !== user.username) {
+    const existingUser = await User.findOne({ username: normalizedUsername, _id: { $ne: userId } });
     if (existingUser) {
       throw new ApiError(409, 'Username is already taken.');
     }
   }
 
   user.fullName = body.fullName || user.fullName;
-  user.username = body.username || user.username;
+  user.username = normalizedUsername || user.username;
   user.phone = body.phone || user.phone;
   user.gender = body.gender || user.gender;
   user.dob = body.dob || user.dob;
