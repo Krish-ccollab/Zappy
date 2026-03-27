@@ -45,7 +45,7 @@ export const updateProfile = async ({ userId, body, file, onlineUserIds = new Se
   user.dob = body.dob || user.dob;
 
   if (file) {
-    const cloudinary = getCloudinary(); // 👈 fix
+    const cloudinary = getCloudinary();
     const base64 = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
     const uploadResult = await cloudinary.uploader.upload(base64, {
       folder: 'zappy/profile-pictures',

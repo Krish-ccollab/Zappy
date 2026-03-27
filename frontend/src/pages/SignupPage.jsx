@@ -27,18 +27,6 @@ const SignupPage = () => {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-
-    // 👈 ye validation add karo
-    const { password } = form;
-    if (password.length < 8) {
-      alert('Password must be at least 8 characters.');
-      return;
-    }
-    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      alert('Password must include uppercase, lowercase, and a number.');
-      return;
-    }
-
     navigate('/verify-otp', { state: { form, profilePic } });
   };
 
@@ -48,20 +36,42 @@ const SignupPage = () => {
         <span className="chip">OTP signup + Cloudinary avatar</span>
         <h1>Create your Zappy account</h1>
         <form className="form-grid two-columns" onSubmit={handleSubmit}>
-          <input placeholder="Full Name" value={form.fullName} onChange={updateField('fullName')} required />
-          <input type="email" placeholder="Email" value={form.email} onChange={updateField('email')} required />
-          <input placeholder="Username" value={form.username} onChange={updateField('username')} required />
-          <input type="password" placeholder="Password" value={form.password} onChange={updateField('password')} required />
-          <input placeholder="Phone Number" value={form.phone} onChange={updateField('phone')} required />
-          <input type="date" value={form.dob} onChange={updateField('dob')} required />
-          <select value={form.gender} onChange={updateField('gender')}>
-            <option value="other">Other</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-          </select>
+          <label className="form-field">
+            <input placeholder="Enter your full name" value={form.fullName} onChange={updateField('fullName')} required />
+            <small className="field-hint">Use your real name so people can identify you easily.</small>
+          </label>
+          <label className="form-field">
+            <input type="email" placeholder="Enter your email (OTP will be sent)" value={form.email} onChange={updateField('email')} required />
+            <small className="field-hint">A one-time verification code will be sent to this email.</small>
+          </label>
+          <label className="form-field">
+            <input placeholder="Choose a unique username" value={form.username} onChange={updateField('username')} required />
+            <small className="field-hint">Only letters, numbers, underscores allowed.</small>
+          </label>
+          <label className="form-field">
+            <input type="password" placeholder="Create a strong password" value={form.password} onChange={updateField('password')} required />
+            <small className="field-hint">Use at least 6–8 characters for better security.</small>
+          </label>
+          <label className="form-field">
+            <input placeholder="Enter your phone number" value={form.phone} onChange={updateField('phone')} required />
+            <small className="field-hint">Include your active number for account recovery.</small>
+          </label>
+          <label className="form-field">
+            <input type="date" value={form.dob} onChange={updateField('dob')} required />
+            <small className="field-hint">Select your date of birth.</small>
+          </label>
+          <label className="form-field">
+            <select value={form.gender} onChange={updateField('gender')}>
+              <option value="other">Other</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+            <small className="field-hint">Choose the option you are most comfortable with.</small>
+          </label>
           <label className="file-field">
             <span>Profile Picture</span>
             <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={updateField('profilePic')} />
+            <small className="field-hint">Upload your profile photo (optional).</small>
           </label>
           <div className="helper-panel">
             <strong>Before you continue</strong>

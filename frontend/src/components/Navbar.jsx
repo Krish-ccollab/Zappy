@@ -10,6 +10,7 @@ const Navbar = ({ requests, onRespond }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [requestedIds, setRequestedIds] = useState(() => new Set());
+  const [followingIds, setFollowingIds] = useState(() => new Set());
   const [isSearching, setIsSearching] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -37,6 +38,31 @@ const Navbar = ({ requests, onRespond }) => {
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
+
+  // 👇 Existing friends/chats load karo — inhe "Following" dikhana hai
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setFollowingIds(new Set());
+      return;
+    }
+
+    let active = true;
+    api
+      .get('/chats')
+      .then(({ data }) => {
+        if (!active) return;
+        const ids = new Set(data.map((chat) => chat.peer?._id).filter(Boolean));
+        setFollowingIds(ids);
+      })
+      .catch(() => {
+        if (!active) return;
+        setFollowingIds(new Set());
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated || !debouncedQuery.trim()) {
@@ -135,7 +161,10 @@ const Navbar = ({ requests, onRespond }) => {
               <div className="dropdown-card search-dropdown">
                 {isSearching && <div className="search-status">Searching...</div>}
                 {!isSearching && results.map((result) => {
+                  const isFollowing = followingIds.has(result._id);
                   const isRequested = requestedIds.has(result._id);
+                  const isDisabled = isFollowing || isRequested;
+                  const buttonLabel = isFollowing ? 'Following' : isRequested ? 'Requested' : 'Send Request';
 
                   return (
                     <article key={result._id} className="search-result-card">
@@ -146,11 +175,11 @@ const Navbar = ({ requests, onRespond }) => {
                       </div>
                       <button
                         type="button"
-                        className={`search-request-button ${isRequested ? 'requested' : ''}`}
-                        onClick={() => sendRequest(result._id)}
-                        disabled={isRequested}
+                        className={`search-request-button ${isFollowing ? 'following' : ''} ${isRequested ? 'requested' : ''}`}
+                        onClick={() => { if (!isDisabled) sendRequest(result._id); }}
+                        disabled={isDisabled}
                       >
-                        {isRequested ? 'Requested' : 'Send Request'}
+                        {buttonLabel}
                       </button>
                     </article>
                   );

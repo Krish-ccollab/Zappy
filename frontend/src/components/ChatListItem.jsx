@@ -59,7 +59,16 @@ const ChatListItem = memo(({ chat, active, unreadCount = 0, onSelect, onViewProf
                 onViewProfile(chat);
               }}
             >
-              View Profile
+              <button
+                type="button"
+                className="ghost menu-item"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onViewProfile(chat);
+                }}
+              >
+                View Profile
+              </button>
             </button>
             <button
               type="button"
