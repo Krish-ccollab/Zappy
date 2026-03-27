@@ -26,7 +26,7 @@ const MessageBubble = memo(
 
     return (
       <article
-        className={`message-bubble ${isMine ? 'mine' : ''} ${message.isDeleted ? 'deleted' : ''}`}
+        className={`message-bubble ${isMine ? 'mine' : ''} ${message.isDeleted ? 'deleted' : ''} ${isEditing ? 'editing' : ''}`}
         onContextMenu={(event) => {
           if (isEditing) return;
           event.preventDefault();
@@ -50,10 +50,17 @@ const MessageBubble = memo(
         {message.image && <ChatImage src={message.image} alt="attachment" onOpenViewer={onOpenImageViewer} />}
         {isEditing ? (
           <div className="message-edit-box">
-            <input value={editValue} onChange={(event) => onEditChange(event.target.value)} maxLength={5000} autoFocus />
+            <span className="message-edit-label">Editing message…</span>
+            <input
+              className="message-edit-input"
+              value={editValue}
+              onChange={(event) => onEditChange(event.target.value)}
+              maxLength={5000}
+              autoFocus
+            />
             <div className="message-edit-actions">
-              <button type="button" className="ghost" onClick={onEditCancel}>Cancel</button>
-              <button type="button" onClick={onEditSave}>Save</button>
+              <button type="button" className="ghost edit-cancel-button" onClick={onEditCancel}>Cancel</button>
+              <button type="button" className="edit-save-button" onClick={onEditSave}>Save</button>
             </div>
           </div>
         ) : (
