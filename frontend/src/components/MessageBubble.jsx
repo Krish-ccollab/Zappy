@@ -3,9 +3,34 @@ import ChatImage from './ChatImage';
 import { formatTime } from '../utils/formatters';
 
 const TickIcon = ({ status }) => {
-  if (status === 'read') return <span style={{ color: '#53bdeb' }}>✓✓</span>;
-  if (status === 'delivered') return <span style={{ color: '#8696a0' }}>✓✓</span>;
-  return <span style={{ color: '#8696a0' }}>✓</span>;
+  if (status === 'read') {
+    return (
+      <span style={{
+        color: '#53bdeb',
+        fontSize: '0.75rem',
+        display: 'inline',
+        fontStyle: 'normal'
+      }}>✓✓</span>
+    );
+  }
+  if (status === 'delivered') {
+    return (
+      <span style={{
+        color: 'rgba(255,255,255,0.78)',
+        fontSize: '0.75rem',
+        display: 'inline',
+        fontStyle: 'normal'
+      }}>✓✓</span>
+    );
+  }
+  return (
+    <span style={{
+      color: 'rgba(255,255,255,0.78)',
+      fontSize: '0.75rem',
+      display: 'inline',
+      fontStyle: 'normal'
+    }}>✓</span>
+  );
 };
 
 const MessageBubble = memo(
@@ -25,7 +50,7 @@ const MessageBubble = memo(
       }
     };
 
-    const metaInfo = `${formatTime(message.timestamp)}${isMine ? ' ✓✓' : ''}`;
+    const timeOnly = formatTime(message.timestamp);
     const shouldShowMetaLine = !message.image || Boolean(message.message);
 
     return (
@@ -49,12 +74,27 @@ const MessageBubble = memo(
         <button type="button" className="message-menu-button" aria-label="Message actions" onClick={openActions}>
           ⋮
         </button>
-        {message.image && <ChatImage src={message.image} alt="attachment" metaInfo={metaInfo} onOpenViewer={onOpenImageViewer} />}
-        {message.message && <p className={message.isDeleted ? 'message-deleted-copy' : ''}>{message.message}</p>}
+
+        {message.image && (
+          <ChatImage
+            src={message.image}
+            alt="attachment"
+            metaInfo={timeOnly}
+            onOpenViewer={onOpenImageViewer}
+          />
+        )}
+
+        {message.message && (
+          <p className={message.isDeleted ? 'message-deleted-copy' : ''}>
+            {message.message}
+          </p>
+        )}
+
         {shouldShowMetaLine && (
           <span className="message-meta-line">
             {message.isEdited && !message.isDeleted && <em>(edited)</em>}
-            <span>{metaInfo}</span>
+            <span>{timeOnly}</span>
+            {isMine && <TickIcon status={message.status} />}
           </span>
         )}
       </article>

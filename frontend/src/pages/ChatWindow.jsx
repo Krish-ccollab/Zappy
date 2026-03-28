@@ -35,6 +35,11 @@ const ChatWindow = ({
   const socket = getSocket();
 
   useEffect(() => {
+    if (!chat?._id || !socket) return;
+    socket.emit('chat:read', chat._id);
+  }, [chat?._id, messages.length, socket]);
+
+  useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typingState]);
 
@@ -221,15 +226,15 @@ const ChatWindow = ({
 
   const actionOptions = actionMessage
     ? [
-        ...(isMine(actionMessage)
-          ? [
-              { label: 'Delete for everyone', tone: 'danger', onClick: () => handleDeleteAction('everyone') },
-              { label: 'Delete for me', tone: 'danger', onClick: () => handleDeleteAction('me') },
-              { label: 'Edit message', onClick: () => startEditing(actionMessage) },
-            ]
-          : [{ label: 'Delete for me', tone: 'danger', onClick: () => handleDeleteAction('me') }]),
-        { label: 'Cancel', onClick: () => setActionMessage(null) },
-      ]
+      ...(isMine(actionMessage)
+        ? [
+          { label: 'Delete for everyone', tone: 'danger', onClick: () => handleDeleteAction('everyone') },
+          { label: 'Delete for me', tone: 'danger', onClick: () => handleDeleteAction('me') },
+          { label: 'Edit message', onClick: () => startEditing(actionMessage) },
+        ]
+        : [{ label: 'Delete for me', tone: 'danger', onClick: () => handleDeleteAction('me') }]),
+      { label: 'Cancel', onClick: () => setActionMessage(null) },
+    ]
     : [];
 
   return (

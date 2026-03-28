@@ -1,10 +1,7 @@
 import { useMemo, useState } from 'react';
 
 const getBlurPreviewUrl = (url) => {
-  if (!url.includes('/upload/')) {
-    return url;
-  }
-
+  if (!url.includes('/upload/')) return url;
   return url.replace('/upload/', '/upload/e_blur:1200,q_1,w_48/');
 };
 
@@ -18,36 +15,50 @@ const ChatImage = ({ src, alt = 'attachment', metaInfo = '', onOpenViewer }) => 
       <button
         type="button"
         className={`chat-image-button ${isLoaded ? 'loaded' : ''}`}
-        onClick={() => onOpenViewer({ src, originalSrc: src })}
+        onClick={() => isLoaded && onOpenViewer({ src, originalSrc: src })}
       >
         <span className="chat-image-frame">
-          <img className="message-image message-image-preview" src={previewUrl} alt="" aria-hidden="true" />
+          {/* Blur preview — shows instantly */}
+          <img
+            className="message-image message-image-preview"
+            src={previewUrl}
+            alt=""
+            aria-hidden="true"
+          />
+          {/* Main image — fades in when loaded */}
           <img
             className={`message-image message-image-main ${isLoaded ? 'ready' : ''}`}
             src={src}
             alt={alt}
             loading="lazy"
             decoding="async"
-            onLoad={() => {
-              setIsLoaded(true);
-              setError('');
-            }}
-            onError={() => {
-              setError('Unable to load image.');
-              setIsLoaded(true);
-            }}
+            onLoad={() => { setIsLoaded(true); setError(''); }}
+            onError={() => { setError('Unable to load image.'); setIsLoaded(true); }}
           />
         </span>
-        {!isLoaded && <span className="chat-image-overlay">Loading image…</span>}
-        {metaInfo && <span className="chat-image-meta">{metaInfo}</span>}
+
+        {/* Loading overlay */}
+        {!isLoaded && !error && (
+          <span className="chat-image-overlay">Loading…</span>
+        )}
+
+        {/* Timestamp — WhatsApp style overlay on image */}
+        {isLoaded && metaInfo && (
+          <span className="chat-image-meta">{metaInfo}</span>
+        )}
+
+        {isLoaded && (
+    <a className="chat-image-download"
+      href={src.replace('/upload/', '/upload/fl_attachment/')}
+      download="zappy-image.png"
+      onClick={(e) => e.stopPropagation()}>
+      ⬇ Download
+    </a>
+  )}
       </button>
-      <a
-        className="chat-image-download"
-        href={src.replace('/upload/', '/upload/fl_attachment/')}
-        download="zappy-image.png"
-      >⬇ Download</a>
+
       {error && <small className="error-text">{error}</small>}
-    </div>
+    </div >
   );
 };
 
