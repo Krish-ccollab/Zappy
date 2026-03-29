@@ -16,6 +16,7 @@ dotenv.config();
 
 const app = express();
 app.locals.onlineUserIds = new Set();
+app.set('trust proxy', 1);
 
 applySecurityMiddleware(app);
 app.use('/api', apiLimiter);
