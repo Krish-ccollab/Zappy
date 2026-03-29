@@ -20,14 +20,14 @@ export const hashToken = (token) => crypto.createHash('sha256').update(token).di
 
 export const accessCookieOptions = {
   httpOnly: true,
-  sameSite: 'lax',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // ✅ 'lax' se 'none'
   secure: process.env.NODE_ENV === 'production',
   maxAge: accessAgeMs
 };
 
 export const refreshCookieOptions = {
   httpOnly: true,
-  sameSite: 'strict',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // ✅ 'strict' se 'none'
   secure: process.env.NODE_ENV === 'production',
   maxAge: refreshAgeMs
 };
